@@ -26,10 +26,27 @@ AUFS, BFQ and Ureadahead support available.
 ```
 
 ## What works:
- - Kernel is in development, tested...
+- Keyboard
+- Keyboard's Hotkeys
+- Trackpad
+- Touchscreen (multitouch works)
+- Screen rotation
+- Sound
+- HDMI output
+- Switch to External Screen (HDMI)
+- Light sensor
+- Micro SD reader (Read & Write)
+- Wireless/Wifi
+- Bluetooth
+- Battery status information is available
+- Shutdown correctly works
+- Reboot correctly works
+- Screen power management works
+- "SLEEP"(suspend) works
 
 ## What doesn't work:
- - Kernel is in development, tested...
+- Sreen backlight (always at full brightness)
+- Built-in camera
 
 
 ### Kernel config file
