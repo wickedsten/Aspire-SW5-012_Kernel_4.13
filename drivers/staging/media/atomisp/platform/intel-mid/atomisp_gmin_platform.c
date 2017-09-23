@@ -278,6 +278,7 @@ static const struct gmin_cfg_var sw5_vars[] = {
 	{ "INT33FB:00_CsiPort",  "0" },
 	{ "INT33FB:00_CsiLanes", "1" },
 	{ "INT33FB:00_CamClk",   "1" },
+	{ "INT33FB:00_ClkSrc",   "0" },
 	{},
 };
 
