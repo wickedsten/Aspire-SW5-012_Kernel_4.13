@@ -275,6 +275,10 @@ static const struct gmin_cfg_var t100_vars[] = {
 };
 
 static const struct gmin_cfg_var sw5_vars[] = {
+	{ "OV2722:00_CsiPort",  "0" },
+	{ "OV2722:00_CsiLanes", "1" },
+	{ "OV2722:00_CamClk",   "1" },
+	{ "OV2722:00_ClkSrc",   "0" },
 	{ "INT33FB:00_CsiPort",  "0" },
 	{ "INT33FB:00_CsiLanes", "1" },
 	{ "INT33FB:00_CamClk",   "1" },
@@ -340,11 +344,11 @@ static const struct {
 } hard_vars[] = {
 	{ "BYT-T FFD8", ffrd8_vars },
 	{ "T100TA", t100_vars },
+	{ "Fendi2", sw5_vars },
 	{ "MRD7", mrd7_vars },
 	{ "ST70408", ecs7_vars },
 	{ "VTA0803", i8880_vars },
 	{ "T701", insyde_t701_vars },
-	{ "SW5-012", sw5_vars },
 };
 
 
