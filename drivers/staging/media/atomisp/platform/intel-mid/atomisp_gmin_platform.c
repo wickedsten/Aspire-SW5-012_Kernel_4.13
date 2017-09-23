@@ -274,6 +274,13 @@ static const struct gmin_cfg_var t100_vars[] = {
 	{},
 };
 
+static const struct gmin_cfg_var sw5_vars[] = {
+	{ "INT33FB:00_CsiPort",  "0" },
+	{ "INT33FB:00_CsiLanes", "1" },
+	{ "INT33FB:00_CamClk",   "1" },
+	{},
+};
+
 static const struct gmin_cfg_var mrd7_vars[] = {
 	{"INT33F8:00_CamType", "1"},
 	{"INT33F8:00_CsiPort", "1"},
@@ -336,6 +343,7 @@ static const struct {
 	{ "ST70408", ecs7_vars },
 	{ "VTA0803", i8880_vars },
 	{ "T701", insyde_t701_vars },
+	{ "SW5-012", sw5_vars },
 };
 
 
