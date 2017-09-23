@@ -83,6 +83,17 @@ config BH1780
 	 To compile this driver as a module, choose M here: the module will
 	 be called bh1780.
 
+config CM3218
+	depends on I2C
+	tristate "CM3218 driver ambient light sensor"
+	help
+	 Say Y here if you use cm3218.
+	 This option enables ambient light sensor using
+	 Capella cm3218 device driver.
+
+	 To compile this driver as a module, choose M here:
+	 the module will be called cm3218.
+
 config CM32181
 	depends on I2C
 	tristate "CM32181 driver"
