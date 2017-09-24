@@ -275,10 +275,12 @@ static const struct gmin_cfg_var t100_vars[] = {
 };
 
 static const struct gmin_cfg_var sw5_vars[] = {
+	{ "OV2722:00_CamId", "ov2722" },
 	{ "OV2722:00_CsiPort",  "0" },
 	{ "OV2722:00_CsiLanes", "1" },
 	{ "OV2722:00_CamClk",   "1" },
 	{ "OV2722:00_ClkSrc",   "0" },
+	{ "INT33FB:00_CamId", "ov2722" },
 	{ "INT33FB:00_CsiPort",  "0" },
 	{ "INT33FB:00_CsiLanes", "1" },
 	{ "INT33FB:00_CamClk",   "1" },
