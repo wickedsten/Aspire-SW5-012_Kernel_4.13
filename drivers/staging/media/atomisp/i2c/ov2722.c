@@ -29,9 +29,9 @@
 #include <linux/gpio.h>
 #include <linux/moduleparam.h>
 #include <media/v4l2-device.h>
-#include "../include/linux/atomisp_gmin_platform.h"
-#include <linux/acpi.h>
 #include <linux/io.h>
+#include <linux/acpi.h>
+#include "../include/linux/atomisp_gmin_platform.h"
 
 #include "ov2722.h"
 
@@ -638,6 +638,8 @@ static int ov2722_init(struct v4l2_subdev *sd)
 	ov2722_res = ov2722_res_preview;
 	N_RES = N_RES_PREVIEW;
 
+	ret = ov2722_init_registers(sd);
+
 	mutex_unlock(&dev->input_lock);
 
 	return 0;
@@ -645,9 +647,8 @@ static int ov2722_init(struct v4l2_subdev *sd)
 
 static int power_ctrl(struct v4l2_subdev *sd, bool flag)
 {
-	int ret = -1;
+	int ret = 0;
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
-
 	if (!dev || !dev->platform_data)
 		return -ENODEV;
 
@@ -656,24 +657,22 @@ static int power_ctrl(struct v4l2_subdev *sd, bool flag)
 		return dev->platform_data->power_ctrl(sd, flag);
 
 	if (flag) {
-		ret = dev->platform_data->v1p8_ctrl(sd, 1);
-		if (ret == 0) {
-			ret = dev->platform_data->v2p8_ctrl(sd, 1);
-			if (ret)
-				dev->platform_data->v1p8_ctrl(sd, 0);
-		}
-	} else {
-		ret = dev->platform_data->v1p8_ctrl(sd, 0);
-		ret |= dev->platform_data->v2p8_ctrl(sd, 0);
+		ret |= dev->platform_data->v1p8_ctrl(sd, 1);
+		ret |= dev->platform_data->v2p8_ctrl(sd, 1);
+		usleep_range(10000, 15000);
 	}
 
+	if (!flag || ret) {
+		ret |= dev->platform_data->v1p8_ctrl(sd, 0);
+		ret |= dev->platform_data->v2p8_ctrl(sd, 0);
+	}
 	return ret;
 }
 
 static int gpio_ctrl(struct v4l2_subdev *sd, bool flag)
 {
+	int ret;
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
-	int ret = -1;
 
 	if (!dev || !dev->platform_data)
 		return -ENODEV;
@@ -682,14 +681,21 @@ static int gpio_ctrl(struct v4l2_subdev *sd, bool flag)
 	if (dev->platform_data->gpio_ctrl)
 		return dev->platform_data->gpio_ctrl(sd, flag);
 
-	/* Note: the GPIO order is asymmetric: always RESET#
-	 * before PWDN# when turning it on or off.
-	 */
-	ret = dev->platform_data->gpio0_ctrl(sd, flag);
-	/*
-	 *ov2722 PWDN# active high when pull down,opposite to the convention
-	 */
-	ret |= dev->platform_data->gpio1_ctrl(sd, !flag);
+	/* The OV2722 documents only one GPIO input (#XSHUTDN), but
+	 * existing integrations often wire two (reset/power_down)
+	 * because that is the way other sensors work.  There is no
+	 * way to tell how it is wired internally, so existing
+	 * firmwares expose both and we drive them symmetrically. */
+	if (flag) {
+		ret = dev->platform_data->gpio0_ctrl(sd, 1);
+		usleep_range(10000, 15000);
+		/* Ignore return from second gpio, it may not be there */
+		dev->platform_data->gpio1_ctrl(sd, 1);
+		usleep_range(10000, 15000);
+	} else {
+		dev->platform_data->gpio1_ctrl(sd, 0);
+		ret = dev->platform_data->gpio0_ctrl(sd, 0);
+	}
 	return ret;
 }
 
@@ -890,6 +896,7 @@ static int ov2722_set_fmt(struct v4l2_subdev *sd,
 	int idx;
 	if (format->pad)
 		return -EINVAL;
+
 	if (!fmt)
 		return -EINVAL;
 	ov2722_info = v4l2_get_subdev_hostdata(sd);
@@ -969,6 +976,7 @@ static int ov2722_get_fmt(struct v4l2_subdev *sd,
 
 	if (format->pad)
 		return -EINVAL;
+
 	if (!fmt)
 		return -EINVAL;
 
@@ -998,7 +1006,7 @@ static int ov2722_detect(struct i2c_client *client)
 	}
 	ret = ov2722_read_reg(client, OV2722_8BIT,
 					OV2722_SC_CMMN_CHIP_ID_L, &low);
-	id = (high << 8) | low;
+	id = ((((u16) high) << 8) | (u16) low);
 
 	if ((id != OV2722_ID) && (id != OV2720_ID)) {
 		dev_err(&client->dev, "sensor ID error\n");
@@ -1009,8 +1017,8 @@ static int ov2722_detect(struct i2c_client *client)
 					OV2722_SC_CMMN_SUB_ID, &high);
 	revision = (u8) high & 0x0f;
 
-	dev_dbg(&client->dev, "sensor_revision = 0x%x\n", revision);
-	dev_dbg(&client->dev, "detect ov2722 success\n");
+	dev_info(&client->dev, "sensor_revision id = 0x%x\n", id);
+
 	return 0;
 }
 
@@ -1027,6 +1035,7 @@ static int ov2722_s_stream(struct v4l2_subdev *sd, int enable)
 				OV2722_STOP_STREAMING);
 
 	mutex_unlock(&dev->input_lock);
+
 	return ret;
 }
 
@@ -1134,6 +1143,8 @@ static int ov2722_s_parm(struct v4l2_subdev *sd,
 {
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
 	dev->run_mode = param->parm.capture.capturemode;
+
+	v4l2_info(client, "\n%s:run_mode :%x\n", __func__, dev->run_mode);
 
 	mutex_lock(&dev->input_lock);
 	switch (dev->run_mode) {
@@ -1245,12 +1256,10 @@ static int ov2722_remove(struct i2c_client *client)
 		dev->platform_data->platform_deinit();
 
 	dev->platform_data->csi_cfg(sd, 0);
-	v4l2_ctrl_handler_free(&dev->ctrl_handler);
+
 	v4l2_device_unregister_subdev(sd);
-
-	atomisp_gmin_remove_subdev(sd);
-
 	media_entity_cleanup(&dev->sd.entity);
+	v4l2_ctrl_handler_free(&dev->ctrl_handler);
 	kfree(dev);
 
 	return 0;
@@ -1316,10 +1325,13 @@ static int ov2722_probe(struct i2c_client *client,
 	dev->pad.flags = MEDIA_PAD_FL_SOURCE;
 	dev->format.code = MEDIA_BUS_FMT_SBGGR10_1X10;
 	dev->sd.entity.function = MEDIA_ENT_F_CAM_SENSOR;
-
-	ret = media_entity_pads_init(&dev->sd.entity, 1, &dev->pad);
-	if (ret)
+	ret =
+	    v4l2_ctrl_handler_init(&dev->ctrl_handler,
+				   ARRAY_SIZE(ov2722_controls));
+	if (ret) {
 		ov2722_remove(client);
+		return ret;
+	}
 
 	if (ACPI_HANDLE(&client->dev))
 		ret = atomisp_register_i2c_module(&dev->sd, ovpdev, RAW_CAMERA);
@@ -1329,7 +1341,15 @@ static int ov2722_probe(struct i2c_client *client,
 out_ctrl_handler_free:
 	v4l2_ctrl_handler_free(&dev->ctrl_handler);
 
+	ret = media_entity_pads_init(&dev->sd.entity, 1, &dev->pad);
+	if (ret)
+	{
+		ov2722_remove(client);
+		dev_dbg(&client->dev, "+++ remove ov2722 \n");
+	}
+	return ret;
 out_free:
+	dev_dbg(&client->dev, "+++ out free \n");
 	v4l2_device_unregister_subdev(&dev->sd);
 	kfree(dev);
 	return ret;
