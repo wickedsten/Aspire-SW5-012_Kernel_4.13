@@ -262,6 +262,83 @@ static const struct i2c_device_id ov2722_id[] = {
 	{}
 };
 
+	static struct ov2722_reg const ov2722_global_setting[] = {
+	    {OV2722_8BIT, 0x0103, 0x01},
+	    {OV2722_8BIT, 0x3002, 0x00},
+	    {OV2722_8BIT, 0x3016, 0x1c},
+	    {OV2722_8BIT, 0x3018, 0x44},
+	    {OV2722_8BIT, 0x3020, 0x00},
+	    {OV2722_8BIT, 0x3080, 0x02},
+	    {OV2722_8BIT, 0x3082, 0x45},
+	    {OV2722_8BIT, 0x3084, 0x09},
+	    {OV2722_8BIT, 0x3085, 0x04},
+	    {OV2722_8BIT, 0x3503, 0x03},
+	    {OV2722_8BIT, 0x350b, 0x36},
+	    {OV2722_8BIT, 0x3600, 0xb4},
+	    {OV2722_8BIT, 0x3603, 0x39},
+	    {OV2722_8BIT, 0x3604, 0x24},
+	    {OV2722_8BIT, 0x3605, 0x00},
+	    {OV2722_8BIT, 0x3620, 0x26},
+	    {OV2722_8BIT, 0x3621, 0x37},
+	    {OV2722_8BIT, 0x3622, 0x04},
+	    {OV2722_8BIT, 0x3628, 0x00},
+	    {OV2722_8BIT, 0x3705, 0x3c},
+	    {OV2722_8BIT, 0x370c, 0x50},
+	    {OV2722_8BIT, 0x370d, 0xc0},
+	    {OV2722_8BIT, 0x3718, 0x88},
+	    {OV2722_8BIT, 0x3720, 0x00},
+	    {OV2722_8BIT, 0x3721, 0x00},
+	    {OV2722_8BIT, 0x3722, 0x00},
+	    {OV2722_8BIT, 0x3723, 0x00},
+	    {OV2722_8BIT, 0x3738, 0x00},
+	    {OV2722_8BIT, 0x3717, 0x58},
+	    {OV2722_8BIT, 0x3781, 0x80},
+	    {OV2722_8BIT, 0x3789, 0x60},
+	    {OV2722_8BIT, 0x3800, 0x00},
+	    {OV2722_8BIT, 0x3819, 0x04},
+	    {OV2722_8BIT, 0x4000, 0x81},
+	    {OV2722_8BIT, 0x4001, 0x40},
+	    {OV2722_8BIT, 0x4602, 0x02},
+	    {OV2722_8BIT, 0x481f, 0x36},
+	    {OV2722_8BIT, 0x4825, 0x36},
+	    {OV2722_8BIT, 0x4837, 0x18},
+	    {OV2722_8BIT, 0x5002, 0x30},
+	    {OV2722_8BIT, 0x5004, 0x04},//manual awb 1x
+	    {OV2722_8BIT, 0x5005, 0x00},
+	    {OV2722_8BIT, 0x5006, 0x04},
+	    {OV2722_8BIT, 0x5007, 0x00},
+	    {OV2722_8BIT, 0x5008, 0x04},
+	    {OV2722_8BIT, 0x5009, 0x00},
+	    {OV2722_8BIT, 0x5080, 0x00},
+	    {OV2722_8BIT, 0x3701, 0x64},  //add on 14/05/13
+	    {OV2722_8BIT, 0x3784, 0x0c},  //based OV2722_R1A_AM10.ovt add on 14/06/13
+	    {OV2722_8BIT, 0x5780, 0x3e},  //based OV2722_R1A_AM10.ovt,Adjust DPC setting (57xx) on 14/06/13
+	    {OV2722_8BIT, 0x5781, 0x0f},
+	    {OV2722_8BIT, 0x5782, 0x04},
+	    {OV2722_8BIT, 0x5783, 0x02},
+	    {OV2722_8BIT, 0x5784, 0x01},
+	    {OV2722_8BIT, 0x5785, 0x01},
+	    {OV2722_8BIT, 0x5786, 0x00},
+	    {OV2722_8BIT, 0x5787, 0x04},
+	    {OV2722_8BIT, 0x5788, 0x02},
+	    {OV2722_8BIT, 0x5789, 0x00},
+	    {OV2722_8BIT, 0x578a, 0x01},
+	    {OV2722_8BIT, 0x578b, 0x02},
+	    {OV2722_8BIT, 0x578c, 0x03},
+	    {OV2722_8BIT, 0x578d, 0x03},
+	    {OV2722_8BIT, 0x578e, 0x08},
+	    {OV2722_8BIT, 0x578f, 0x0c},
+	    {OV2722_8BIT, 0x5790, 0x08},
+	    {OV2722_8BIT, 0x5791, 0x04},
+	    {OV2722_8BIT, 0x5792, 0x00},
+	    {OV2722_8BIT, 0x5793, 0x00},
+	    {OV2722_8BIT, 0x5794, 0x03}, //based OV2722_R1A_AM10.ovt,Adjust DPC setting (57xx) on 14/06/13
+		{OV2722_8BIT, 0x0100, 0x00},	//stream off
+
+		{OV2722_TOK_TERM, 0, 0}
+	};
+
+
 /*
  * Register settings for various resolution
  */
