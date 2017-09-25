@@ -628,9 +628,22 @@ struct v4l2_ctrl_config ov2722_controls[] = {
 	 },
 };
 
+static int ov2722_init_registers(struct v4l2_subdev *sd)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+	int ret;
+
+	ret = ov2722_write_reg(client, OV2722_8BIT, OV2722_SW_RESET, 0x01);
+	ret |= ov2722_write_reg_array(client, ov2722_global_setting);
+
+	return ret;
+}
+
 static int ov2722_init(struct v4l2_subdev *sd)
 {
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
+
+	int ret;
 
 	mutex_lock(&dev->input_lock);
 
@@ -1142,6 +1155,7 @@ static int ov2722_s_parm(struct v4l2_subdev *sd,
 			struct v4l2_streamparm *param)
 {
 	struct ov2722_device *dev = to_ov2722_sensor(sd);
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	dev->run_mode = param->parm.capture.capturemode;
 
 	v4l2_info(client, "\n%s:run_mode :%x\n", __func__, dev->run_mode);
