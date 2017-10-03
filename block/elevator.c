@@ -47,11 +47,6 @@ static DEFINE_SPINLOCK(elv_list_lock);
 static LIST_HEAD(elv_list);
 
 /*
- * Merge hash stuff.
- */
-#define rq_hash_key(rq)		(blk_rq_pos(rq) + blk_rq_sectors(rq))
-
-/*
  * Query io scheduler to see if the current process issuing bio may be
  * merged with rq.
  */
@@ -75,6 +70,10 @@ bool elv_bio_merge_ok(struct request *rq, struct bio *bio)
 {
 	if (!blk_rq_merge_ok(rq, bio))
 		return false;
+
+	/* We need to support to merge bio from sw queue */
+	if (!rq->q->elevator)
+		return true;
 
 	if (!elv_iosched_allow_bio_merge(rq, bio))
 		return false;
@@ -272,14 +271,12 @@ EXPORT_SYMBOL(elevator_exit);
 
 static inline void __elv_rqhash_del(struct request *rq)
 {
-	hash_del(&rq->hash);
-	rq->rq_flags &= ~RQF_HASHED;
+	__rqhash_del(rq);
 }
 
 void elv_rqhash_del(struct request_queue *q, struct request *rq)
 {
-	if (ELV_ON_HASH(rq))
-		__elv_rqhash_del(rq);
+	rqhash_del(rq);
 }
 EXPORT_SYMBOL_GPL(elv_rqhash_del);
 
@@ -287,37 +284,22 @@ void elv_rqhash_add(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
 
-	BUG_ON(ELV_ON_HASH(rq));
-	hash_add(e->hash, &rq->hash, rq_hash_key(rq));
-	rq->rq_flags |= RQF_HASHED;
+	rqhash_add(e->hash, rq);
 }
 EXPORT_SYMBOL_GPL(elv_rqhash_add);
 
 void elv_rqhash_reposition(struct request_queue *q, struct request *rq)
 {
-	__elv_rqhash_del(rq);
-	elv_rqhash_add(q, rq);
+	struct elevator_queue *e = q->elevator;
+
+	rqhash_reposition(e->hash, rq);
 }
 
 struct request *elv_rqhash_find(struct request_queue *q, sector_t offset)
 {
 	struct elevator_queue *e = q->elevator;
-	struct hlist_node *next;
-	struct request *rq;
 
-	hash_for_each_possible_safe(e->hash, rq, next, hash, offset) {
-		BUG_ON(!ELV_ON_HASH(rq));
-
-		if (unlikely(!rq_mergeable(rq))) {
-			__elv_rqhash_del(rq);
-			continue;
-		}
-
-		if (rq_hash_key(rq) == offset)
-			return rq;
-	}
-
-	return NULL;
+	return rqhash_find(e->hash, offset);
 }
 
 /*
@@ -435,8 +417,9 @@ void elv_dispatch_add_tail(struct request_queue *q, struct request *rq)
 }
 EXPORT_SYMBOL(elv_dispatch_add_tail);
 
-enum elv_merge elv_merge(struct request_queue *q, struct request **req,
-		struct bio *bio)
+static enum elv_merge __elv_merge(struct request_queue *q,
+		struct request **req, struct bio *bio,
+		struct hlist_head *hash, struct request *last_merge)
 {
 	struct elevator_queue *e = q->elevator;
 	struct request *__rq;
@@ -453,11 +436,11 @@ enum elv_merge elv_merge(struct request_queue *q, struct request **req,
 	/*
 	 * First try one-hit cache.
 	 */
-	if (q->last_merge && elv_bio_merge_ok(q->last_merge, bio)) {
-		enum elv_merge ret = blk_try_merge(q->last_merge, bio);
+	if (last_merge && elv_bio_merge_ok(last_merge, bio)) {
+		enum elv_merge ret = blk_try_merge(last_merge, bio);
 
 		if (ret != ELEVATOR_NO_MERGE) {
-			*req = q->last_merge;
+			*req = last_merge;
 			return ret;
 		}
 	}
@@ -468,11 +451,15 @@ enum elv_merge elv_merge(struct request_queue *q, struct request **req,
 	/*
 	 * See if our hash lookup can find a potential backmerge.
 	 */
-	__rq = elv_rqhash_find(q, bio->bi_iter.bi_sector);
+	__rq = rqhash_find(hash, bio->bi_iter.bi_sector);
 	if (__rq && elv_bio_merge_ok(__rq, bio)) {
 		*req = __rq;
 		return ELEVATOR_BACK_MERGE;
 	}
+
+	/* no elevator when merging bio to blk-mq sw queue */
+	if (!e)
+		return ELEVATOR_NO_MERGE;
 
 	if (e->uses_mq && e->type->ops.mq.request_merge)
 		return e->type->ops.mq.request_merge(q, req, bio);
@@ -480,6 +467,19 @@ enum elv_merge elv_merge(struct request_queue *q, struct request **req,
 		return e->type->ops.sq.elevator_merge_fn(q, req, bio);
 
 	return ELEVATOR_NO_MERGE;
+}
+
+enum elv_merge elv_merge(struct request_queue *q, struct request **req,
+		struct bio *bio)
+{
+	return __elv_merge(q, req, bio, q->elevator->hash, q->last_merge);
+}
+
+enum elv_merge elv_merge_ctx(struct request_queue *q, struct request **req,
+		struct bio *bio, struct blk_mq_ctx *ctx)
+{
+	WARN_ON_ONCE(!q->mq_ops);
+	return __elv_merge(q, req, bio, ctx->hash, ctx->last_merge);
 }
 
 /*
@@ -527,16 +527,25 @@ void elv_merged_request(struct request_queue *q, struct request *rq,
 		enum elv_merge type)
 {
 	struct elevator_queue *e = q->elevator;
+	struct hlist_head *hash = e->hash;
+
+	/* we do bio merge on blk-mq sw queue */
+	if (q->mq_ops && !e) {
+		rq->mq_ctx->last_merge = rq;
+		hash = rq->mq_ctx->hash;
+		goto reposition;
+	}
+
+	q->last_merge = rq;
 
 	if (e->uses_mq && e->type->ops.mq.request_merged)
 		e->type->ops.mq.request_merged(q, rq, type);
 	else if (!e->uses_mq && e->type->ops.sq.elevator_merged_fn)
 		e->type->ops.sq.elevator_merged_fn(q, rq, type);
 
+ reposition:
 	if (type == ELEVATOR_BACK_MERGE)
-		elv_rqhash_reposition(q, rq);
-
-	q->last_merge = rq;
+		rqhash_reposition(hash, rq);
 }
 
 void elv_merge_requests(struct request_queue *q, struct request *rq,
@@ -730,6 +739,10 @@ struct request *elv_latter_request(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
 
+	/* no elevator when merging bio to blk-mq sw queue */
+	if (!e)
+		return NULL;
+
 	if (e->uses_mq && e->type->ops.mq.next_request)
 		return e->type->ops.mq.next_request(q, rq);
 	else if (!e->uses_mq && e->type->ops.sq.elevator_latter_req_fn)
@@ -741,6 +754,10 @@ struct request *elv_latter_request(struct request_queue *q, struct request *rq)
 struct request *elv_former_request(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
+
+	/* no elevator when merging bio to blk-mq sw queue */
+	if (!e)
+		return NULL;
 
 	if (e->uses_mq && e->type->ops.mq.former_request)
 		return e->type->ops.mq.former_request(q, rq);
