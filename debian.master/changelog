@@ -1,6 +1,6 @@
-linux (4.13.3-041303.201709200606) unstable; urgency=low
+linux (4.13.4-041304.201709270931) unstable; urgency=low
 
-  Mainline build at commit: v4.13.3
+  Mainline build at commit: v4.13.4
 
- -- Mainline Build <kernel@tangerine>  Wed, 20 Sep 2017 06:07:37 -0400
+ -- Mainline Build <kernel@tangerine>  Wed, 27 Sep 2017 09:32:17 -0400
 
