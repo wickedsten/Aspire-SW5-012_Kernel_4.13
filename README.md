@@ -1,7 +1,7 @@
 # Aspire-SW5-012_Kernel_4.13.*
-Kernel 4.13.* for Acer Aspire Switch 10 SW5-012/SW3-013
+Kernel 4.13.3 for Acer Aspire Switch 10 **SW5-012/Fendy2 ONLY**!
 
-Forked from XanMod: Linux kernel source code tree https://github.com/xanmod/linux
+Forked from XanMod: Linux kernel source code tree - [Xanmod Project](https://github.com/xanmod/linux)
 
 ```bash
 
